@@ -2,21 +2,41 @@ import requests
 import json
 
 # 🔹 CONFIGURATION: Set your API keys and endpoints
-WORLDCAT_API_KEY = "THE WORLDCAT API KEY!"
+WS_KEY = "Worldcat API Client ID"
+WS_SECRET = "Worldcat API Secret"
 OMEKA_API_KEY = "My Omeka Classic API"
 OMEKA_URL = "https://archivovenezuela.com/api/items"
 
+def fetch_oclc_token():
+	auth_url = "https://oauth.oclc.org/token"
+	auth_data = (WS_KEY, WS_SECRET)
+	payload = {"grant_type": 'client_credentials', "scope": 'wcapi'}
+	headers = {"Content-Type": "application/json"}
+
+	response = requests.post(auth_url, auth=auth_data,  params=payload, headers=headers)
+
+	if response.status_code == 200:
+			token = response.json().get("access_token")
+			return token
+	else:
+			print(response.text)
+			print(f"Authentication failed. Status code: {response.status_code}")
+
 # Function to fetch metadata from WorldCat
 def fetch_worldcat_data(oclc_number):
-    url = f"https://www.worldcat.org/webservices/catalog/content/{oclc_number}?wskey={WORLDCAT_API_KEY}&format=json"
-    response = requests.get(url)
-   
-    if response.status_code == 200:
-        data = response.json()
-        return data
-    else:
-        print(f"Error fetching OCLC {oclc_number}: {response.status_code}")
-        return None
+	resource = 'bibs'
+	headers = {"Content-Type": "application/json",
+             'Authorization': "Bearer {}".format(token)}
+	api_url = 'https://americas.discovery.api.oclc.org/worldcat/search/v2'
+	combined_url = "/".join([api_url,resource,oclc_number])
+ 
+	response = requests.get(combined_url, headers=headers)
+	if response.status_code == 200:
+			data = response.json()
+			return data
+	else:
+			print(f"Error fetching OCLC {oclc_number}: {response.text}")
+			return None
 
 # Function to convert WorldCat data to Omeka Dublin Core format
 def convert_to_omeka_metadata(worldcat_data):
@@ -56,7 +76,7 @@ def batch_import(oclc_numbers):
             omeka_data = convert_to_omeka_metadata(worldcat_data)
            
             print(f"🚀 Posting item to Omeka for OCLC: {oclc}")
-            post_to_omeka(omeka_data)
+            # post_to_omeka(omeka_data)
         else:
             print(f"⚠️ Skipping OCLC: {oclc}, data not found.")
 
@@ -64,4 +84,5 @@ def batch_import(oclc_numbers):
 oclc_numbers_list = ["1234567", "7654321", "11223344"]  # Replace with actual OCLC numbers
 
 # Run the batch import
+token = fetch_oclc_token()
 batch_import(oclc_numbers_list)
